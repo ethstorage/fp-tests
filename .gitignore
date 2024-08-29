@@ -1,0 +1,8 @@
+# devnet
+devnet/
+
+# Rust target
+target/
+
+# Components directory
+components/

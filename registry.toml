@@ -1,0 +1,72 @@
+################################################################
+#                             VMs                              #
+################################################################
+
+[platform.native]
+default = true
+
+[platform.cannon]
+default = true
+build.repo = 'ethereum-optimism/optimism'
+build.rev = 'op-program/v1.3.1-rc.2'
+build.workdir = 'cannon'
+build.cmd = 'make'
+build.artifacts.vm = 'bin/cannon'
+
+[platform.asterisc]
+build.repo = 'ethereum-optimism/asterisc'
+build.rev = 'v1.0.0'
+build.workdir = '.'
+build.cmd = 'make'
+build.artifacts.vm = 'rvgo/bin/asterisc'
+
+################################################################
+#                           PROGRAMS                           #
+################################################################
+
+[program.op-program-native]
+default = true
+platform-compat = ['native']
+build.repo = 'ethereum-optimism/optimism'
+build.rev = 'op-program/v1.3.1-rc.2'
+build.workdir = 'op-program'
+build.cmd = 'make'
+build.artifacts.client = 'bin/op-program'
+build.artifacts.host = 'bin/op-program'
+
+[program.kona-native]
+platform-compat = ['native']
+build.repo = 'ethereum-optimism/kona'
+build.rev = 'main'
+build.workdir = '.'
+build.cmd = 'just build --bin kona --profile release-client-lto && just build-native --bin kona-host --release'
+build.artifacts.client = 'target/release-client-lto/kona'
+build.artifacts.host = 'target/release/kona-host'
+
+[program.op-program-mips]
+default = true
+platform-compat = ['cannon']
+build.repo = 'ethereum-optimism/optimism'
+build.rev = 'op-program/v1.3.1-rc.2'
+build.workdir = 'op-program'
+build.cmd = 'make op-program-client-mips && make op-program-host'
+build.artifacts.client = 'bin/op-program-client.elf'
+build.artifacts.host = 'bin/op-program'
+
+[program.op-program-riscv]
+platform-compat = ['asterisc']
+build.repo = 'ethereum-optimism/optimism'
+build.rev = 'op-program/v1.3.1-rc.2'
+build.workdir = 'op-program'
+build.cmd = 'make op-program-client-riscv && make op-program-host'
+build.artifacts.client = 'bin/op-program-riscv.elf'
+build.artifacts.host = 'bin/op-program'
+
+[program.kona-riscv]
+platform-compat = ['asterisc']
+build.repo = 'ethereum-optimism/kona'
+build.rev = 'main'
+build.workdir = '.'
+build.cmd = 'just build-asterisc --bin kona --profile release-client-lto && just build-native --bin kona-host --release'
+build.artifacts.client = 'target/riscv64gc-unknown-none-elf/release-client-lto/kona'
+build.artifacts.host = 'target/release/kona-host'

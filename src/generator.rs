@@ -216,6 +216,7 @@ impl<'a> TestCaseGenerator<'a> {
             .ok_or(eyre!("Artifact not found"))?;
 
         // Run the program.
+        info!(target: "test-gen", "Executing reference program on the native platform...");
         let native_program = Arc::new(OpProgram::new(program_bin, false));
         let result = Native
             .run(&inputs, native_program, self.workdir.path())

@@ -51,8 +51,6 @@ impl<'a> TestPipeline<'a> {
     /// 2. Gather the tests that will be ran from the active matrix.
     /// 3. Decompress the compressed artifacts within the active fixture folders.
     pub(crate) async fn setup(mut self) -> Result<Self> {
-        // TODO: Move to `matrix` struct.
-
         // Attempt to build all platforms and programs in the matrix.
         self.try_build_matrix().await?;
 

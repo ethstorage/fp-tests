@@ -1,0 +1,10 @@
+name = "basic-transfers-success"
+expected-status = 0
+
+[inputs]
+l1-head = "0xf03e1a27a0afb6519863f43f0ce783d06e2e16184aa52c2649af3c28473550c7"
+l2-block-number = 134
+l2-claim = "0xf7d616a91bb71147d937b49e29737f8260ac0c5be0953fdadfa0ebc64ab1ba2b"
+l2-output-root = "0x6d8218838670896a84a18721787100a876f9164ab06499dcaaaa4749522f52b7"
+l2-head = "0xbc231cdb0a8b4da9139cd4770f0ac5838c74e85dff0f215050923e2493196bd5"
+l2-chain-id = 1337

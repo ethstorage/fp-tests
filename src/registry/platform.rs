@@ -10,7 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     fmt::Display,
     path::{Path, PathBuf},
-    str::FromStr, sync::Arc,
+    str::FromStr,
+    sync::Arc,
 };
 
 pub(crate) mod cannon;

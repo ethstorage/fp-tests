@@ -15,7 +15,10 @@ pub(crate) struct OpProgram {
 impl OpProgram {
     /// Create a new `OpProgram` instance.
     pub(crate) fn new(binary: PathBuf, server_mode: bool) -> Self {
-        Self { binary, server_mode }
+        Self {
+            binary,
+            server_mode,
+        }
     }
 }
 

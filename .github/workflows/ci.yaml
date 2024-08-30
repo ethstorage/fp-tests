@@ -22,14 +22,12 @@ jobs:
         with:
           cache-on-failure: true
       - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@just
       - name: cargo test
-        run: cargo nextest run --release --all --all-features --locked
+        run: just test
   cargo-lint:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      matrix:
-        target: ["native", "cannon", "asterisc"]
     name: lint-${{ matrix.target }}
     steps:
       - name: Checkout sources
@@ -45,34 +43,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: ${{ matrix.target }}
       - name: fmt + lint
-        run: just lint-${{ matrix.target }}
-  cargo-build-benches:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    name: build-benchmarks
-    continue-on-error: true
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-          token: ${{ secrets.PAT_TOKEN }}
-      - uses: taiki-e/install-action@just
-      - name: Install Rust stable toolchain
-        uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - name: build benches
-        run: cargo bench --no-run --workspace --all --features test-utils
+        run: just lint
   cargo-build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      matrix:
-        target: ["native", "cannon", "asterisc"]
     name: build-${{ matrix.target }}
     continue-on-error: true
     steps:
@@ -87,6 +62,5 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-          prefix-key: ${{ matrix.target }}
       - name: build
-        run: just build-${{ matrix.target }}
+        run: just build

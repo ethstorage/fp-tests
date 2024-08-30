@@ -4,7 +4,7 @@ use super::Platform;
 use crate::registry::program::{Program, ProgramHostInputs};
 use async_trait::async_trait;
 use color_eyre::{eyre::eyre, Result};
-use std::{io::Write, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 use tokio::process::Command;
 use tracing::debug;
 
@@ -36,12 +36,6 @@ impl Platform for Native {
             .current_dir(workdir)
             .output()
             .await?;
-
-        // Dump logs if the command failed.
-        if !result.status.success() {
-            std::io::stdout().write_all(&result.stdout)?;
-            std::io::stderr().write_all(&result.stderr)?;
-        }
 
         Ok(result.status.code().ok_or(eyre!("Missing exit code"))? as u8)
     }

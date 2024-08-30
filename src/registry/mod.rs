@@ -64,13 +64,19 @@ impl FPRegistry {
                 .program
                 .iter()
                 .filter_map(|(prog_name, prog_def)| {
-                    ((cfg
-                        .map(|cfg| cfg.program.as_ref().map(|p| p.contains(prog_name)))
-                        .flatten()
-                        .unwrap_or_default()
-                        || prog_def.default)
-                        && prog_def.platform_compat.contains(&vm_kind))
-                    .then_some((prog_name.clone(), prog_def.clone()))
+                    let platform_compat = prog_def.platform_compat.contains(&vm_kind);
+
+                    if let Some(cfg) = cfg {
+                        let is_default = prog_def.default;
+                        let is_selected = cfg
+                            .program
+                            .as_ref()
+                            .map_or(false, |p| p.contains(prog_name));
+                        (platform_compat && (is_default || is_selected))
+                            .then(|| (prog_name.clone(), prog_def.clone()))
+                    } else {
+                        platform_compat.then(|| (prog_name.clone(), prog_def.clone()))
+                    }
                 })
                 .collect::<HashMap<_, _>>();
 

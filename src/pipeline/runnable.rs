@@ -3,9 +3,9 @@
 use crate::{
     fixture::FixtureMetadata,
     registry::{
-        platform::Platform,
-        program::{Program, ProgramHostInputs},
-        FPPDefinition,
+        platform::PlatformKind,
+        program::{ProgramHostInputs, ProgramKind},
+        FPPDefinition, PlatformAndPrograms,
     },
 };
 use color_eyre::{
@@ -24,32 +24,36 @@ pub(crate) struct RunnableTest {
     /// The inputs for the test case.
     pub(crate) inputs: Arc<ProgramHostInputs>,
     /// The platform to run the test on.
-    pub(crate) platform: Arc<dyn Platform + Send + Sync>,
+    pub(crate) platform_kind: PlatformKind,
+    /// The platform definition.
+    pub(crate) platform_definition: Arc<PlatformAndPrograms>,
     /// The program to run.
-    pub(crate) program: Arc<dyn Program + Send + Sync>,
+    pub(crate) program_kind: ProgramKind,
     /// The program definition.
     pub(crate) program_definition: Arc<FPPDefinition>,
 }
 
 impl RunnableTest {
-    /// Create a new [TestCaseRun].
+    /// Create a new [RunnableTest].
     pub(crate) fn new(
         fixture_meta: Arc<FixtureMetadata>,
         inputs: Arc<ProgramHostInputs>,
-        platform: Arc<dyn Platform + Send + Sync>,
-        program: Arc<dyn Program + Send + Sync>,
+        platform: PlatformKind,
+        platform_definition: Arc<PlatformAndPrograms>,
+        program: ProgramKind,
         program_definition: Arc<FPPDefinition>,
     ) -> Self {
         Self {
             fixture_meta,
             inputs,
-            platform,
-            program,
+            platform_kind: platform,
+            platform_definition,
+            program_kind: program,
             program_definition,
         }
     }
 
-    /// Run the test case.
+    /// Run the test case and return whether or not it passed.
     pub(crate) async fn run(&self) -> Result<bool> {
         // Create a temporary directory for the test case.
         let workdir = tempdir()?;
@@ -61,18 +65,29 @@ impl RunnableTest {
             .get_artifact("client")
             .ok_or(eyre!("Failed to get client artifact"))?;
 
+        let platform = self.platform_definition.vm_kind.get_platform(
+            self.platform_definition
+                .vm
+                .build
+                .as_ref()
+                .map(|b| b.get_artifact("vm"))
+                .flatten(),
+        )?;
+        let program = self.program_kind.get_program(
+            self.program_definition
+                .build
+                .get_artifact("host")
+                .ok_or(eyre!("No host artifact"))?,
+        );
+
         // Load the binary into the platform's state format.
-        self.platform
-            .load_elf(
-                client_artifact.as_path(),
-                workdir.path().join("state.json").as_path(),
-            )
+        platform
+            .load_elf(client_artifact.as_path(), workdir.path())
             .await?;
 
         // Run the program on the platform.
-        // TODO: Validate output.
-        let result = self.platform
-            .run(self.inputs.as_ref(), self.program.clone(), workdir.path())
+        let result = platform
+            .run(self.inputs.as_ref(), program, workdir.path())
             .await?;
 
         Ok(result == self.fixture_meta.expected_status)

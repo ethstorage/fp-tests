@@ -72,6 +72,11 @@ impl Cli {
                     .bold(true);
                 cli_table::print_stdout(table)?;
             }
+            CliSubcommand::Clean => {
+                // TODO: Comamnd for cleaning decompressed fixture files if they are left behind
+                // due to an error.
+                unimplemented!()
+            }
         }
         Ok(())
     }
@@ -79,10 +84,10 @@ impl Cli {
     /// Initializes the tracing subscriber
     ///
     /// # Arguments
-    /// * `verbosity_level` - The verbosity level (0-2)
+    /// - `verbosity_level` - The verbosity level (0-2)
     ///
     /// # Returns
-    /// * `Result<()>` - Ok if successful, Err otherwise.
+    /// - `Result<()>` - Ok if successful, Err otherwise.
     pub(crate) fn init_tracing_subscriber(self) -> Result<Self> {
         color_eyre::install()?;
 
@@ -108,6 +113,8 @@ pub(crate) enum CliSubcommand {
     Test(TestConfig),
     /// Generate a new test case.
     Generate(GenerateConfig),
+    /// Clean up decompressed fixture files.
+    Clean,
 }
 
 #[derive(Args, Debug, Clone)]

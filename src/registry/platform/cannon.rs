@@ -3,12 +3,10 @@
 use super::Platform;
 use crate::registry::program::{Program, ProgramHostInputs};
 use async_trait::async_trait;
-use color_eyre::{
-    eyre::{ensure, eyre},
-    Result,
-};
+use color_eyre::{eyre::ensure, Result};
+use serde::{Deserialize, Serialize};
 use std::{
-    io::Write,
+    fs,
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -29,13 +27,15 @@ impl Cannon {
 
 #[async_trait]
 impl Platform for Cannon {
-    async fn load_elf(&self, elf_path: &Path, out: &Path) -> Result<()> {
+    async fn load_elf(&self, elf_path: &Path, workdir: &Path) -> Result<()> {
         let result = Command::new(self.binary.display().to_string())
             .arg("load-elf")
             .arg("--path")
             .arg(elf_path)
             .arg("--out")
-            .arg(out)
+            .arg(workdir.join("state.json"))
+            .arg("--meta")
+            .arg(workdir.join("meta.json"))
             .output()
             .await?;
 
@@ -55,8 +55,7 @@ impl Platform for Cannon {
         workdir: &Path,
     ) -> Result<u8> {
         let host_args = program.host_cmd(inputs)?;
-        dbg!(&self.binary, &host_args);
-        let result = Command::new(self.binary.display().to_string())
+        Command::new(self.binary.display().to_string())
             .arg("run")
             .arg("--info-at")
             .arg("%10000000")
@@ -70,12 +69,21 @@ impl Platform for Cannon {
             .output()
             .await?;
 
-        // Dump logs if the command failed.
-        if !result.status.success() {
-            std::io::stdout().write_all(&result.stdout)?;
-            std::io::stderr().write_all(&result.stderr)?;
-        }
+        // Read `out.json`
+        let output = serde_json::from_slice::<PartialCannonOutput>(
+            fs::read(workdir.join("out.json"))?.as_slice(),
+        )?;
+        ensure!(output.exited, "Program did not exit");
 
-        Ok(result.status.code().ok_or(eyre!("Missing exit code"))? as u8)
+        Ok(output.exit)
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PartialCannonOutput {
+    /// Whether or not the program has exited.
+    exited: bool,
+    /// The exit code of the program.
+    exit: u8,
 }

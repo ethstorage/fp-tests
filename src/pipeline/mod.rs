@@ -71,9 +71,9 @@ impl<'a> TestPipeline<'a> {
     /// 1. Schedule the tests to run in parallel in a worker pool.
     pub(crate) async fn run(self) -> Result<Self> {
         let tests = self.tests.clone().ok_or(eyre!("No tests to run"))?;
+        let num_tests = tests.len();
 
         // Inform the cli of the number of tests to run.
-        let num_tests = tests.len() * self.matrix.iter().map(|p| p.programs.len()).sum::<usize>();
         println!(
             "\n\nRunning {} tests across {} platforms...",
             num_tests.blue(),
@@ -101,10 +101,10 @@ impl<'a> TestPipeline<'a> {
                         .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ "),
                 );
                 pb.set_prefix(format!(
-                    "{}",
-                    // case.platform_kind.magenta(),
-                    // program_kind.cyan(),
-                    case.fixture_meta.name.clone()
+                    "{}::{}::{}",
+                    case.platform_kind.magenta(),
+                    case.program_kind.cyan(),
+                    case.fixture_meta.name.blue()
                 ));
                 pb.enable_steady_tick(Duration::from_millis(50));
                 pb.set_message("Executing test...");
@@ -114,7 +114,8 @@ impl<'a> TestPipeline<'a> {
 
                 // Notify the user that the test has completed.
                 pb.finish_with_message(format!(
-                    "Done {} Test took {} {} Status: {}",
+                    "{} {} Test took {} {} Status: {}",
+                    "Done".green().bold(),
                     "|".black(),
                     HumanDuration(start_time.elapsed()).magenta(),
                     "|".black(),
@@ -125,15 +126,23 @@ impl<'a> TestPipeline<'a> {
                     }
                 ));
 
-                Ok::<_, color_eyre::Report>(())
+                Ok::<_, color_eyre::Report>(pass)
             });
         }
 
         // Join all test tasks.
-        // TODO: Test summary.
+        let mut num_passed = 0;
         while let Some(result) = join_set.join_next().await {
-            result??;
+            num_passed += result?? as usize;
         }
+        println!(
+            "{} - {} tests {}, {} tests {}.\n",
+            "Completed".bold(),
+            num_passed.to_string().blue().bold(),
+            "passed".green().bold(),
+            (num_tests - num_passed).to_string().blue().bold(),
+            "failed".red().bold()
+        );
 
         Ok(self)
     }
@@ -244,26 +253,13 @@ impl<'a> TestPipeline<'a> {
                         },
                     };
 
-                    let platform = platform.vm_kind.get_platform(
-                        platform
-                            .vm
-                            .build
-                            .as_ref()
-                            .map(|b| b.get_artifact("vm"))
-                            .flatten(),
-                    )?;
-                    let program = program_kind.get_program(
-                        program_def
-                            .build
-                            .get_artifact("host")
-                            .ok_or(eyre!("No host artifact"))?,
-                    );
-
+                    // TODO: Lift the arc's, terrible code I wrote at 2am.
                     tests.push(RunnableTest::new(
                         Arc::new(fixture.metadata.clone()),
                         Arc::new(inputs),
-                        platform,
-                        program,
+                        platform.vm_kind,
+                        Arc::new(platform.clone()),
+                        *program_kind,
                         Arc::new(program_def.clone()),
                     ));
                 }

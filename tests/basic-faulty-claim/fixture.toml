@@ -1,0 +1,10 @@
+name = "basic-faulty-claim"
+expected-status = 1
+
+[inputs]
+l1-head = "0x269e7aa3246958a3c5f63bd77c805776bae29e00ce7388556e6d5604190b6911"
+l2-block-number = 20
+l2-claim = "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+l2-output-root = "0x4192a5d273b4603e5186e52d7e30124d4c42e41960ce8d03da118396f050652c"
+l2-head = "0xa9b6854b6c6f62df0a52f6c649e5ec94b40bd265bf4a7b873a511e27c489881e"
+l2-chain-id = 1337

@@ -3,18 +3,19 @@
 use std::path::PathBuf;
 
 use super::Program;
-use crate::fixture::{FixtureSource, ProgramHostInputs};
+use crate::registry::program::{ProgramHostInputs, ProgramHostSource};
 use color_eyre::Result;
 
 /// The `op-program` fault proof program.
 pub(crate) struct OpProgram {
     pub(crate) binary: PathBuf,
+    pub(crate) server_mode: bool,
 }
 
 impl OpProgram {
     /// Create a new `OpProgram` instance.
-    pub(crate) fn new(binary: PathBuf) -> Self {
-        Self { binary }
+    pub(crate) fn new(binary: PathBuf, server_mode: bool) -> Self {
+        Self { binary, server_mode }
     }
 }
 
@@ -39,12 +40,17 @@ impl Program for OpProgram {
             inputs.genesis_path.display().to_string(),
         ];
 
+        // Set up the server mode flag.
+        if self.server_mode {
+            cmd.push("--server".to_string());
+        }
+
         // Set up the data source flags.
         match inputs.source.clone() {
-            FixtureSource::Disk { path } => {
+            ProgramHostSource::Disk { path } => {
                 cmd.extend(vec!["--datadir".to_string(), path.display().to_string()]);
             }
-            FixtureSource::Rpc {
+            ProgramHostSource::Rpc {
                 l1,
                 l1_beacon,
                 l2,

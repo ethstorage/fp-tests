@@ -1,13 +1,17 @@
 //! Contains the implementation of the [Platform] trait for the Cannon virtual machine.
 
 use super::Platform;
-use crate::{fixture::ProgramHostInputs, registry::program::Program, util::run_cmd};
+use crate::registry::program::{Program, ProgramHostInputs};
 use async_trait::async_trait;
 use color_eyre::{
     eyre::{ensure, eyre},
     Result,
 };
-use std::path::{Path, PathBuf};
+use std::{
+    io::Write,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use tokio::process::Command;
 
 /// The Cannon virtual machine.
@@ -24,47 +28,54 @@ impl Cannon {
 }
 
 #[async_trait]
-impl<PROG> Platform<PROG> for Cannon
-where
-    PROG: Program + Send + Sync,
-{
+impl Platform for Cannon {
     async fn load_elf(&self, elf_path: &Path, out: &Path) -> Result<()> {
-        let mut cmd = Command::new(self.binary.display().to_string());
-        let result = run_cmd(
-            cmd.arg("load-elf")
-                .arg("--path")
-                .arg(elf_path)
-                .arg("--out")
-                .arg(out),
-        )
-        .await?;
+        let result = Command::new(self.binary.display().to_string())
+            .arg("load-elf")
+            .arg("--path")
+            .arg(elf_path)
+            .arg("--out")
+            .arg(out)
+            .output()
+            .await?;
 
         ensure!(
-            result.success(),
+            result.status.success(),
             "Failed to load ELF file into Cannon: {}",
-            result
+            result.status
         );
 
         Ok(())
     }
 
-    async fn run(&self, inputs: &ProgramHostInputs, program: &PROG, workdir: &Path) -> Result<u8> {
-        let mut cmd = Command::new(self.binary.display().to_string());
+    async fn run(
+        &self,
+        inputs: &ProgramHostInputs,
+        program: Arc<dyn Program + Send + Sync>,
+        workdir: &Path,
+    ) -> Result<u8> {
         let host_args = program.host_cmd(inputs)?;
-        let result = run_cmd(
-            cmd.arg("run")
-                .arg("--info-at")
-                .arg("%10000000")
-                .arg("--proof-at")
-                .arg("never")
-                .arg("--input")
-                .arg("state.json")
-                .arg("--")
-                .args(host_args)
-                .current_dir(workdir),
-        )
-        .await?;
+        dbg!(&self.binary, &host_args);
+        let result = Command::new(self.binary.display().to_string())
+            .arg("run")
+            .arg("--info-at")
+            .arg("%10000000")
+            .arg("--proof-at")
+            .arg("never")
+            .arg("--input")
+            .arg("state.json")
+            .arg("--")
+            .args(host_args)
+            .current_dir(workdir)
+            .output()
+            .await?;
 
-        Ok(result.code().ok_or(eyre!("Missing exit code"))? as u8)
+        // Dump logs if the command failed.
+        if !result.status.success() {
+            std::io::stdout().write_all(&result.stdout)?;
+            std::io::stderr().write_all(&result.stderr)?;
+        }
+
+        Ok(result.status.code().ok_or(eyre!("Missing exit code"))? as u8)
     }
 }

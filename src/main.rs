@@ -9,9 +9,8 @@ use color_eyre::Result;
 mod cli;
 mod fixture;
 mod generator;
+mod pipeline;
 mod registry;
-mod runner;
-mod util;
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> {

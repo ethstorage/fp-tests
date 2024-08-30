@@ -40,7 +40,7 @@ impl FPRegistry {
     pub(crate) fn resolve_matrix<'a>(
         &'a self,
         cfg: Option<&TestConfig>,
-    ) -> Vec<PlatformAndPrograms<'a>> {
+    ) -> Vec<PlatformAndPrograms> {
         let mut matrix = Vec::new();
 
         let selected_platforms = if let Some(cfg) = cfg {
@@ -64,15 +64,18 @@ impl FPRegistry {
                 .program
                 .iter()
                 .filter_map(|(prog_name, prog_def)| {
-                    prog_def
-                        .platform_compat
-                        .contains(&vm_kind)
-                        .then_some((prog_name.clone(), prog_def))
+                    ((cfg
+                        .map(|cfg| cfg.program.as_ref().map(|p| p.contains(prog_name)))
+                        .flatten()
+                        .unwrap_or_default()
+                        || prog_def.default)
+                        && prog_def.platform_compat.contains(&vm_kind))
+                    .then_some((prog_name.clone(), prog_def.clone()))
                 })
                 .collect::<HashMap<_, _>>();
 
             matrix.push(PlatformAndPrograms {
-                vm: vm_def,
+                vm: vm_def.clone(),
                 vm_kind: vm_kind.clone(),
                 programs: compat,
             });
@@ -113,7 +116,7 @@ pub(crate) struct BuildInstructions {
     pub(crate) repo: String,
     /// The revision or tag to build.
     pub(crate) rev: String,
-    /// The workdir of the build, relative to the repository root.
+    /// The workdir of the build.
     pub(crate) workdir: PathBuf,
     /// The build command to run.
     pub(crate) cmd: String,
@@ -123,13 +126,13 @@ pub(crate) struct BuildInstructions {
 
 /// A pair of a platform and its compatible programs.
 #[derive(Debug, Clone)]
-pub(crate) struct PlatformAndPrograms<'a> {
+pub(crate) struct PlatformAndPrograms {
     /// The platform to execute the programs on.
-    pub(crate) vm: &'a PlatformDefinition,
+    pub(crate) vm: PlatformDefinition,
     /// THe kind of the fault proof virtual machine.
     pub(crate) vm_kind: PlatformKind,
     /// The fault proof programs and their names.
-    pub(crate) programs: HashMap<ProgramKind, &'a FPPDefinition>,
+    pub(crate) programs: HashMap<ProgramKind, FPPDefinition>,
 }
 
 #[cfg(test)]

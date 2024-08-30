@@ -39,7 +39,7 @@ platform-compat = ['native']
 build.repo = 'ethereum-optimism/kona'
 build.rev = 'main'
 build.workdir = '.'
-build.cmd = 'just build --bin kona --profile release-client-lto && just build-native --bin kona-host --release'
+build.cmd = 'just build-native --bin kona --profile release-client-lto && just build-native --bin kona-host --release'
 build.artifacts.client = 'target/release-client-lto/kona'
 build.artifacts.host = 'target/release/kona-host'
 

@@ -2,13 +2,12 @@
 
 use crate::{
     cli::GenerateConfig,
-    fixture::{FixtureInputs, FixtureSource, ProgramHostInputs, TestFixture},
+    fixture::{FixtureInputs, FixtureMetadata, TestFixture},
     registry::{
         platform::{native::Native, Platform},
-        program::{op_program::OpProgram, ProgramKind},
+        program::{op_program::OpProgram, ProgramHostInputs, ProgramHostSource, ProgramKind},
         FP_REGISTRY,
     },
-    util::run_cmd,
 };
 use alloy_primitives::{B256, U64};
 use alloy_provider::{network::Ethereum, Provider, ReqwestProvider};
@@ -18,13 +17,16 @@ use color_eyre::{
     eyre::{ensure, eyre},
     Result,
 };
-use std::{fs, path::PathBuf};
+use std::{fs, path::PathBuf, sync::Arc};
 use tempfile::{tempdir, TempDir};
 use tokio::process::Command;
 use tracing::info;
 
 /// The name of the chain configuration artifact on the kurtosis devnet.
-const CHAIN_CONFIG_ARTIFACT: &str = "op-genesis-configs";
+pub(crate) const CHAIN_CONFIG_ARTIFACT: &str = "op-genesis-configs";
+
+/// The name of the witness database directory.
+pub(crate) const WITNESS_DB_DIR_NAME: &str = "witness-db";
 
 /// The test case generator for `fpt`.
 pub(crate) struct TestCaseGenerator<'a> {
@@ -63,15 +65,14 @@ impl<'a> TestCaseGenerator<'a> {
     /// Downlaods the chain configuration from the devnet.
     async fn download_chain_config(&self) -> Result<()> {
         info!(target: "test-gen", "Downloading chain configuration from the devnet...");
-        let mut cmd = Command::new("kurtosis");
-        let status = run_cmd(
-            cmd.arg("files")
-                .arg("download")
-                .arg("devnet")
-                .arg(CHAIN_CONFIG_ARTIFACT)
-                .current_dir(self.workdir.path()),
-        )
-        .await?;
+        let status = Command::new("kurtosis")
+            .arg("files")
+            .arg("download")
+            .arg("devnet")
+            .arg(CHAIN_CONFIG_ARTIFACT)
+            .current_dir(self.workdir.path())
+            .status()
+            .await?;
 
         ensure!(
             status.success(),
@@ -190,11 +191,11 @@ impl<'a> TestCaseGenerator<'a> {
             },
             rollup_cfg_path,
             genesis_path,
-            source: FixtureSource::Rpc {
+            source: ProgramHostSource::Rpc {
                 l1: self.cfg.l1_rpc.clone(),
                 l1_beacon: self.cfg.l1_beacon_rpc.clone(),
                 l2: self.cfg.l2_rpc.clone(),
-                path: "witness-db".into(),
+                path: WITNESS_DB_DIR_NAME.into(),
             },
         })
     }
@@ -209,12 +210,15 @@ impl<'a> TestCaseGenerator<'a> {
 
         // Try to build the reference program, if the artifact is not already present.
         ref_program_def.build.try_build().await?;
-        let program_bin = ref_program_def.build.get_artifact("host")?;
+        let program_bin = ref_program_def
+            .build
+            .get_artifact("host")
+            .ok_or(eyre!("Artifact not found"))?;
 
         // Run the program.
-        let native_program = OpProgram::new(program_bin);
+        let native_program = Arc::new(OpProgram::new(program_bin, false));
         let result = Native
-            .run(&inputs, &native_program, self.workdir.path())
+            .run(&inputs, native_program, self.workdir.path())
             .await?;
         info!(target: "test-gen", "Successfully executed reference program on the native platform. Exit status: {result}");
 
@@ -228,9 +232,11 @@ impl<'a> TestCaseGenerator<'a> {
 
         // Write the test fixture to disk.
         let fixture = TestFixture {
-            name: self.cfg.name.clone(),
+            metadata: FixtureMetadata {
+                name: self.cfg.name.clone(),
+                expected_status: result,
+            },
             inputs: inputs.fixture_inputs,
-            expected_status: result,
         };
         fs::write(
             fixture_path.join("fixture.toml").as_path(),
@@ -240,21 +246,23 @@ impl<'a> TestCaseGenerator<'a> {
 
         // Gzip the witness directory
         info!(target: "test-gen", "Compressing witness database...");
-        let mut cmd = Command::new("tar");
-        run_cmd(
-            cmd.arg("--zstd")
-                .arg("-cf")
-                .arg("witness-db.tar.zst")
-                .arg("witness-db")
-                .current_dir(self.workdir.path().display().to_string()),
-        )
-        .await?;
+        let status = Command::new("tar")
+            .arg("--zstd")
+            .arg("-cf")
+            .arg(format!("{}.tar.zst", WITNESS_DB_DIR_NAME))
+            .arg(WITNESS_DB_DIR_NAME)
+            .current_dir(self.workdir.path().display().to_string())
+            .status()
+            .await?;
+        ensure!(status.success(), "Failed to compress witness database.");
         info!(target: "test-gen", "Compressed witness database successfully.");
 
         // Copy the witness DB archive into the fixture.
         fs::copy(
-            self.workdir.path().join("witness-db.tar.zst"),
-            fixture_path.join("witness-db.tar.zst"),
+            self.workdir
+                .path()
+                .join(format!("{}.tar.zst", WITNESS_DB_DIR_NAME)),
+            fixture_path.join(format!("{}.tar.zst", WITNESS_DB_DIR_NAME)),
         )?;
         info!(target: "test-gen", "Copied witness database archive into test fixture.");
 
@@ -274,6 +282,18 @@ impl<'a> TestCaseGenerator<'a> {
             fixture_path.join("rollup.json"),
         )?;
         info!(target: "test-gen", "Copied chain configuration files into test fixture.");
+
+        // Compress the genesis JSON file.
+        let status = Command::new("zstd")
+            .arg("genesis.json")
+            .current_dir(&fixture_path)
+            .status()
+            .await?;
+        ensure!(status.success(), "Failed to compress genesis.json.");
+        info!(target: "test-gen", "Compressed genesis.json successfully.");
+
+        // Remove the uncompressed genesis JSON file.
+        fs::remove_file(fixture_path.join("genesis.json").as_path())?;
 
         Ok(())
     }

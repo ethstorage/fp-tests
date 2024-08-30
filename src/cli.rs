@@ -2,8 +2,8 @@
 
 use crate::{
     generator::TestCaseGenerator,
+    pipeline::TestPipeline,
     registry::{platform::PlatformKind, program::ProgramKind, FP_REGISTRY},
-    runner::TestRunner,
 };
 use alloy_primitives::B256;
 use clap::{ArgAction, Args, Parser, Subcommand};
@@ -32,7 +32,13 @@ impl Cli {
             }
             CliSubcommand::Test(cfg) => {
                 let matrix = registry.resolve_matrix(Some(&cfg));
-                TestRunner::new(&cfg, matrix).run().await?;
+                TestPipeline::new(&cfg, matrix)
+                    .setup()
+                    .await?
+                    .run()
+                    .await?
+                    .teardown()
+                    .await?
             }
             CliSubcommand::Matrix => {
                 let matrix = registry.resolve_matrix(None);

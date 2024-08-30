@@ -1,18 +1,24 @@
 //! Contains the [Platform] trait, which defines the interface for a fault proof virtual machine.
 
-use super::program::Program;
-use crate::fixture::ProgramHostInputs;
+use super::program::{Program, ProgramHostInputs};
 use async_trait::async_trait;
-use color_eyre::{eyre::bail, Result};
+use color_eyre::{
+    eyre::{bail, eyre},
+    Result,
+};
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, path::Path, str::FromStr};
+use std::{
+    fmt::Display,
+    path::{Path, PathBuf},
+    str::FromStr, sync::Arc,
+};
 
 pub(crate) mod cannon;
 pub(crate) mod native;
 
 /// The minimal interface for a fault proof virtual machine binary.
 #[async_trait]
-pub(crate) trait Platform<PROG: Program> {
+pub(crate) trait Platform {
     /// Load a program into the FPVM's state format.
     ///
     /// ## Takes
@@ -27,13 +33,14 @@ pub(crate) trait Platform<PROG: Program> {
     /// ## Takes
     /// - `program_inputs` - The inputs to the program.
     /// - `program` - The program command specification.
+    /// - `workdir` - The working directory to run the program in.
     ///
     /// ## Returns
     /// - `Result<StatusCode>` - Ok if successful, Err otherwise.
     async fn run(
         &self,
         program_inputs: &ProgramHostInputs,
-        program: &PROG,
+        program: Arc<dyn Program + Send + Sync>,
         workdir: &Path,
     ) -> Result<u8>;
 }
@@ -51,28 +58,20 @@ pub(crate) enum PlatformKind {
     Asterisc,
 }
 
-// impl PlatformKind {
-//     /// Returns the [Platform] implementation for the given kind.
-//     pub(crate) fn get_platform<PROG>(
-//         &self,
-//         binary: Option<PathBuf>,
-//     ) -> Result<Box<dyn Platform<PROG>>>
-//     where
-//         PROG: Program + Send + Sync,
-//     {
-//         match self {
-//             Self::Native => Ok(Box::new(native::Native)),
-//             Self::Cannon => {
-//                 let plat = cannon::Cannon::new(
-//                     binary.ok_or(eyre!("Binary required for `cannon` platform"))?,
-//                 );
-//                 Ok(Box::new(plat))
-//             }
-//             Self::Asterisc => unimplemented!(),
-//         }
-//     }
-// }
-
+impl PlatformKind {
+    pub(crate) fn get_platform(
+        &self,
+        binary: Option<PathBuf>,
+    ) -> Result<Arc<dyn Platform + Send + Sync>> {
+        match self {
+            Self::Native => Ok(Arc::new(native::Native)),
+            Self::Cannon => Ok(Arc::new(cannon::Cannon::new(
+                binary.ok_or_else(|| eyre!("Missing Cannon binary"))?,
+            ))),
+            _ => todo!(),
+        }
+    }
+}
 impl FromStr for PlatformKind {
     type Err = color_eyre::Report;
 

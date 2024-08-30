@@ -1253,6 +1253,7 @@ dependencies = [
  "color-eyre",
  "glob",
  "indicatif",
+ "itertools 0.13.0",
  "serde",
  "serde_json",
  "tempfile",

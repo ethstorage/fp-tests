@@ -1,20 +1,21 @@
 //! Contains the registry type, which holds metadata about the available FPVMs and FPPs.
 
 use crate::cli::TestConfig;
+use once_cell::sync::Lazy;
 use platform::PlatformKind;
 use program::ProgramKind;
 use serde::{Deserialize, Serialize};
-use std::{cell::LazyCell, collections::HashMap, path::PathBuf};
+use std::{collections::HashMap, path::PathBuf};
 
 pub(crate) mod build;
 pub(crate) mod platform;
 pub(crate) mod program;
 
 /// The directory containing the components.
-pub(crate) const COMPONENTS_DIR: &'static str = concat!(env!("HOME"), "/.fpt/components");
+pub(crate) const COMPONENTS_DIR: &str = concat!(env!("HOME"), "/.fpt/components");
 
 /// The FP Registry.
-pub(crate) const FP_REGISTRY: LazyCell<FPRegistry> = LazyCell::new(|| {
+pub(crate) static FP_REGISTRY: Lazy<FPRegistry> = Lazy::new(|| {
     const REGISTRY_SER: &str = include_str!("../../registry.toml");
     toml::from_str(REGISTRY_SER).expect("Failed to parse registry")
 });
@@ -37,10 +38,7 @@ impl FPRegistry {
     ///
     /// ## Returns
     /// - `Vec<DefPair>` - The matrix of FPVMs and FPPs compatible with the [TestConfig].
-    pub(crate) fn resolve_matrix<'a>(
-        &'a self,
-        cfg: Option<&TestConfig>,
-    ) -> Vec<PlatformAndPrograms> {
+    pub(crate) fn resolve_matrix(&self, cfg: Option<&TestConfig>) -> Vec<PlatformAndPrograms> {
         let mut matrix = Vec::new();
 
         let selected_platforms = if let Some(cfg) = cfg {
@@ -63,26 +61,26 @@ impl FPRegistry {
             let compat = self
                 .program
                 .iter()
-                .filter_map(|(prog_name, prog_def)| {
-                    let platform_compat = prog_def.platform_compat.contains(&vm_kind);
+                .filter_map(|(prog_kind, prog_def)| {
+                    let platform_compat = prog_def.platform_compat.contains(vm_kind);
 
                     if let Some(cfg) = cfg {
                         let is_default = prog_def.default;
                         let is_selected = cfg
                             .program
                             .as_ref()
-                            .map_or(false, |p| p.contains(prog_name));
+                            .map_or(false, |p| p.contains(prog_kind));
                         (platform_compat && (is_default || is_selected))
-                            .then(|| (prog_name.clone(), prog_def.clone()))
+                            .then(|| (*prog_kind, prog_def.clone()))
                     } else {
-                        platform_compat.then(|| (prog_name.clone(), prog_def.clone()))
+                        platform_compat.then(|| (*prog_kind, prog_def.clone()))
                     }
                 })
                 .collect::<HashMap<_, _>>();
 
             matrix.push(PlatformAndPrograms {
                 vm: vm_def.clone(),
-                vm_kind: vm_kind.clone(),
+                vm_kind: *vm_kind,
                 programs: compat,
             });
         }

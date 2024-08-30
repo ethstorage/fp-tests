@@ -203,10 +203,12 @@ impl<'a> TestCaseGenerator<'a> {
     /// Runs the reference program with the given [FixtureInputs].
     async fn run_reference_program(&self, inputs: &ProgramHostInputs) -> Result<u8> {
         // Fetch the reference program definition from the registry.
-        let registry = FP_REGISTRY;
-        let ref_program_def = registry.program.get(&ProgramKind::default()).ok_or(eyre!(
-            "Failed to find program definition for reference program."
-        ))?;
+        let ref_program_def = FP_REGISTRY
+            .program
+            .get(&ProgramKind::default())
+            .ok_or(eyre!(
+                "Failed to find program definition for reference program."
+            ))?;
 
         // Try to build the reference program, if the artifact is not already present.
         ref_program_def.build.try_build().await?;
@@ -219,7 +221,7 @@ impl<'a> TestCaseGenerator<'a> {
         info!(target: "test-gen", "Executing reference program on the native platform...");
         let native_program = Arc::new(OpProgram::new(program_bin, false));
         let result = Native
-            .run(&inputs, native_program, self.workdir.path())
+            .run(inputs, native_program, self.workdir.path())
             .await?;
         info!(target: "test-gen", "Successfully executed reference program on the native platform. Exit status: {result}");
 

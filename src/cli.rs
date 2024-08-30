@@ -25,13 +25,12 @@ pub(crate) struct Cli {
 impl Cli {
     /// Parses the CLI arguments and runs the application.
     pub(crate) async fn run(self) -> Result<()> {
-        let registry = FP_REGISTRY;
         match self.subcommand {
             CliSubcommand::Generate(cfg) => {
                 TestCaseGenerator::new(&cfg)?.generate().await?;
             }
             CliSubcommand::Test(cfg) => {
-                let matrix = registry.resolve_matrix(Some(&cfg));
+                let matrix = FP_REGISTRY.resolve_matrix(Some(&cfg));
                 TestPipeline::new(&cfg, matrix)
                     .setup()
                     .await?
@@ -41,7 +40,7 @@ impl Cli {
                     .await?
             }
             CliSubcommand::Matrix => {
-                let matrix = registry.resolve_matrix(None);
+                let matrix = FP_REGISTRY.resolve_matrix(None);
 
                 let mut table_contents = Vec::with_capacity(matrix.len());
                 matrix.iter().for_each(|pair| {

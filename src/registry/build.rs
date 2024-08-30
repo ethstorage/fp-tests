@@ -12,12 +12,11 @@ use tracing::debug;
 impl BuildInstructions {
     /// Returns a specific artifact by name.
     pub(crate) fn get_artifact(&self, name: &str) -> Option<PathBuf> {
-        self.artifacts.get(name).and_then(|path| {
-            let path = PathBuf::from(COMPONENTS_DIR)
+        self.artifacts.get(name).map(|path| {
+            PathBuf::from(COMPONENTS_DIR)
                 .join(self.repo.clone())
                 .join(self.workdir.clone())
-                .join(path);
-            Some(path)
+                .join(path)
         })
     }
 
@@ -30,7 +29,7 @@ impl BuildInstructions {
         let commands = self.cmd.split(" && ").collect::<Vec<_>>();
         for command_str in commands {
             let args = command_str.split_whitespace().collect::<Vec<_>>();
-            let build_output = Command::new(args.get(0).ok_or(eyre!("Command is empty"))?)
+            let build_output = Command::new(args.first().ok_or(eyre!("Command is empty"))?)
                 .args(args.get(1..).ok_or(eyre!("No arguments"))?.iter())
                 .current_dir(
                     PathBuf::from(COMPONENTS_DIR)

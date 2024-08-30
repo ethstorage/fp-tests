@@ -155,6 +155,7 @@ impl<'a> TestPipeline<'a> {
         let unique_fixtures = tests
             .iter()
             .unique_by(|t| t.inputs.genesis_path.as_path())
+            .cloned()
             .collect::<Vec<_>>();
 
         let progress_bar = {
@@ -168,7 +169,7 @@ impl<'a> TestPipeline<'a> {
         let semaphore = Arc::new(Semaphore::new(self.cfg.workers));
         let mut join_set = JoinSet::new();
 
-        for test in unique_fixtures.into_iter().cloned() {
+        for test in unique_fixtures.into_iter() {
             let semaphore = semaphore.clone();
             let progress_bar = progress_bar.clone();
 
@@ -273,6 +274,7 @@ impl<'a> TestPipeline<'a> {
         let unique_fixtures = tests
             .iter()
             .unique_by(|t| t.inputs.genesis_path.as_path())
+            .cloned()
             .collect::<Vec<_>>();
 
         let progress_bar = {
@@ -286,7 +288,7 @@ impl<'a> TestPipeline<'a> {
         let semaphore = Arc::new(Semaphore::new(self.cfg.workers));
         let mut join_set = JoinSet::new();
 
-        for test in unique_fixtures.into_iter().cloned() {
+        for test in unique_fixtures.into_iter() {
             let semaphore = semaphore.clone();
             let progress_bar = progress_bar.clone();
 

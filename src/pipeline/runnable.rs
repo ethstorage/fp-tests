@@ -70,8 +70,7 @@ impl RunnableTest {
                 .vm
                 .build
                 .as_ref()
-                .map(|b| b.get_artifact("vm"))
-                .flatten(),
+                .and_then(|b| b.get_artifact("vm")),
         )?;
         let program = self.program_kind.get_program(
             self.program_definition

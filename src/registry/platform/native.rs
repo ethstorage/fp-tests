@@ -27,7 +27,7 @@ impl Platform for Native {
         let host_cmd = program.host_cmd(inputs)?;
 
         // On the native platform, the host program is ran verbatim.
-        let result = Command::new(&host_cmd.get(0).ok_or(eyre!("Missing host binary"))?)
+        let result = Command::new(host_cmd.first().ok_or(eyre!("Missing host binary"))?)
             .args(
                 host_cmd
                     .get(1..)
